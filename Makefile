@@ -26,6 +26,7 @@ all: example.elf
 clean:
 	find . -type f | xargs touch
 	rm $(OBJS)
+	rm example.elf
 
 %.o: %.c
 	"arm-none-eabi-gcc" $(CFLAGS) $(INCLUDE) $(DEFINE) -o $@ -c $<

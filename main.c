@@ -14,6 +14,19 @@ void main() {
     port0.DIRSET.reg = (1 << 5);
     port0.OUTCLR.reg = (1 << 5);
 
+    // Enable APBC clock for SERCOM0
+    PM->APBCMASK.reg |= PM_APBCMASK_SERCOM0;
+
+    // Enable GCLK0 for SERCOM0
+    GCLK->CLKCTRL.reg = (1 << 14) | // Enable clock
+        (0 << 8) | // GCLK0
+        0x14; // SERCOM0 ID
+    
+    while (GCLK->STATUS.bit.SYNCBUSY) {}
+
+    __disable_irq();
+
+
     // Software reset SERCOM
     usart.CTRLA.reg |= SERCOM_USART_CTRLA_SWRST;
     while(usart.SYNCBUSY.bit.SWRST) {}
@@ -36,7 +49,10 @@ void main() {
 
     // Enable receiver, transmitter, and peripheral
     usart.CTRLB.reg |= SERCOM_USART_CTRLB_RXEN | SERCOM_USART_CTRLB_TXEN;
+    while(usart.SYNCBUSY.bit.CTRLB) {}
+
     usart.CTRLA.bit.ENABLE = 1;
+    while(usart.SYNCBUSY.bit.ENABLE) {}
 
     // Wait for 10 ms so we get a buffer overflow
     for(uint16_t i = 0; i < 10000; i++){ asm("nop"); }
@@ -45,10 +61,10 @@ void main() {
 
     // Disabling the receiver is supposed to clear the RX buffer
     // and clear the FERR, PERR and BUFOVF status flags
-    usart.CTRLB.bit.RXEN = 0;
+    usart.CTRLB.reg &= ~SERCOM_USART_CTRLB_RXEN;
     while(usart.SYNCBUSY.bit.CTRLB) {}
 
-    usart.CTRLB.bit.RXEN = 1;
+    usart.CTRLB.reg |= SERCOM_USART_CTRLB_RXEN;
     while(usart.SYNCBUSY.bit.CTRLB) {}
 
     // Read a couple bytes to make BUFOVF bubble up
@@ -59,6 +75,9 @@ void main() {
     // At this breakpoint we can see that BUFOVF isn't cleared
     asm("bkpt");
 
+    while(1) { asm("nop"); }
+}
 
-
+void HardFault_Handler(){
+    while(1) { asm("bkpt"); }
 }
